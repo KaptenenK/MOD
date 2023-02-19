@@ -1,0 +1,62 @@
+@inherits MudComponentBase
+<MudDialog>
+    <DialogContent>
+        <MudForm Model="@model" @ref="@_form">
+            <MudGrid>
+                <MudSelect MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionText))" MultiSelection="true" @bind-Value="value" @bind-SelectedValues="options" T="string" Label="Select Genres" AdornmentIcon="@Icons.Material.Filled.Search" AnchorOrigin="Origin.BottomCenter">
+                    @foreach (var genre in _genreList)
+                    {
+                        <MudSelectItem T="string" Value="@genre.Id.ToString()">@genre.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">@ConstantString.CANCEL</MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" OnClick="Submit">@ConstantString.OK</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+
+    MudForm? _form = default!;
+    [CascadingParameter]
+    MudDialogInstance MudDialog { get; set; } = default!;
+    [EditorRequired]
+    [Parameter]
+    public List<FilmGenreDTO> model { get; set; } = default!;
+    [EditorRequired]
+    [Parameter]
+    public List<GenreDTO> _genreList { get; set; } = new();
+    [EditorRequired]
+    [Parameter]
+    public int _filmId { get; set; } = new();
+
+    private string value { get; set; } = String.Empty;
+    [EditorRequired]
+    [Parameter]
+    public IEnumerable<string> options { get; set; } = new HashSet<string>() { };
+    private string GetMultiSelectionText(List<string> selectedValues)
+    => $"Selected Genres{(selectedValues.Count > 1 ? "s" : "")}: {string.Join(", ", _genreList.Where(b => selectedValues.Contains(b.Id.ToString())).Select(a => a.Name))}";
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        return base.OnAfterRenderAsync(firstRender);
+    }
+
+    async Task Submit()
+    {
+        model = options.Select(a => new FilmGenreDTO()
+            {
+                FilmId = _filmId,
+                GenreId = int.Parse(a)
+            }).ToList();
+        await _form!.Validate();
+        if (_form!.IsValid)
+        {
+            MudDialog.Close(DialogResult.Ok(model));
+        }
+    }
+    void Cancel() => MudDialog.Cancel();
+}

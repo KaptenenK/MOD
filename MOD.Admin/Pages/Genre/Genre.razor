@@ -1,0 +1,163 @@
+@page "/genre"
+@inject HttpClient httpClient
+
+<PageTitle>Genre</PageTitle>
+
+<article class="content px-4">
+    <MudTable ServerData="@(new Func<TableState, Task<TableData<GenreDTO>>>(ServerReload))"
+              Dense="true" Hover="true" @ref="table" Elevation="25">
+        <ColGroup>
+            <col />
+            <col />
+            <col style="width: 20%;" />
+        </ColGroup>
+        <ToolBarContent>
+            <div class="justify-start pt-3">
+                <MudText Typo="Typo.h6">Genres</MudText>
+                <MudHidden Breakpoint="Breakpoint.SmAndDown">
+                    <MudButton DisableElevation Variant="Variant.Outlined" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               Size="Size.Small"
+                               OnClick="OnCreate"
+                               Style="margin-right: 4px; margin-bottom:4px"
+                               IconColor="Color.Surface">@ConstantString.CREATE</MudButton>
+                </MudHidden>
+            </div>
+            <MudSpacer></MudSpacer><MudTextField @bind-Value="searchString" @bind-Value:after="@table.ReloadServerData" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh><MudTableSortLabel SortLabel="sort_id" T="GenreDTO">Id</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortLabel="sort_name" T="GenreDTO">Name</MudTableSortLabel></MudTh>
+            <MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Id">@context.Id</MudTd>
+            <MudTd DataLabel="Name">@context.Name</MudTd>
+            <MudTd DataLabel="Actions">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" aria-label="edit" Color="Color.Warning" OnClick="(()=>OnUpdate(context))"></MudIconButton>
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" aria-label="delete" Color="Color.Error" OnClick="(()=>OnDelete(context.Id))"></MudIconButton>
+            </MudTd>
+
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText>No matching records found</MudText>
+        </NoRecordsContent>
+        <LoadingContent>
+            <MudText>Loading...</MudText>
+        </LoadingContent>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+</article>
+@code {
+    private IEnumerable<GenreDTO> pagedData;
+    private MudTable<GenreDTO> table;
+
+    private int totalItems;
+    private string searchString = string.Empty;
+
+    private async Task<TableData<GenreDTO>> ServerReload(TableState state)
+    {
+        var data = await httpClient.GetFromJsonAsync<IEnumerable<GenreDTO>>("/api/Genres");
+        data = data.Where(element =>
+        {
+            if (string.IsNullOrWhiteSpace(searchString))
+                return true;
+            if (element.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+                return true;
+            return false;
+        }).ToArray();
+        totalItems = data.Count();
+        switch (state.SortLabel)
+        {
+            case "sort_id":
+                data = data.OrderByDirection(state.SortDirection, o => o.Id);
+                break;
+            case "sort_name":
+                data = data.OrderByDirection(state.SortDirection, o => o.Name);
+                break;
+        }
+
+        pagedData = data.Skip(state.Page * state.PageSize).Take(state.PageSize).ToArray();
+        return new TableData<GenreDTO>() { TotalItems = totalItems, Items = pagedData };
+    }
+
+    private async Task OnCreate()
+    {
+        var dto = new GenreDTO();
+        var parameters = new DialogParameters
+            {
+                { nameof(_GenreFormDialog.model),dto },
+            };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = DialogService.Show<_GenreFormDialog>("Add Genre", parameters, options);
+        var state = await dialog.Result;
+        if (!state.Canceled)
+        {
+            try
+            {
+                var result = await httpClient.PostAsJsonAsync<GenreDTO>("/api/Genres", dto);
+                result.EnsureSuccessStatusCode();
+                await table.ReloadServerData();
+                Snackbar.Add($"{ConstantString.CREATESUCCESS}", MudBlazor.Severity.Success);
+            }
+            catch (Exception e)
+            {
+                Snackbar.Add(e.Message, MudBlazor.Severity.Error);
+            }
+        }
+    }
+
+    private async Task OnUpdate(GenreDTO record)
+    {
+        var dto = record;
+        var parameters = new DialogParameters
+            {
+                { nameof(_GenreFormDialog.model),dto },
+            };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = DialogService.Show<_GenreFormDialog>("Add Genre", parameters, options);
+        var state = await dialog.Result;
+        if (!state.Canceled)
+        {
+            try
+            {
+                var result = await httpClient.PutAsJsonAsync<GenreDTO>("/api/Genres/" + record.Id, dto);
+                result.EnsureSuccessStatusCode();
+                await table.ReloadServerData();
+                Snackbar.Add($"{ConstantString.UPDATESUCCESS}", MudBlazor.Severity.Success);
+            }
+            catch (Exception e)
+            {
+                Snackbar.Add(e.Message, MudBlazor.Severity.Error);
+            }
+        }
+    }
+
+    private async Task OnDelete(int id)
+    {
+        var parameters = new DialogParameters
+                        {
+                    { nameof(DeleteConfirmation.ContentText), "Are you sure you want to delete the select genre" }
+                        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, DisableBackdropClick = true };
+        var dialog = DialogService.Show<DeleteConfirmation>
+        (string.Format("Delete Genre"), parameters, options);
+        var state = await dialog.Result;
+        if (!state.Canceled)
+        {
+            try
+            {
+                var result = await httpClient.DeleteAsync("/api/Genres/" + id);
+                result.EnsureSuccessStatusCode();
+                await table.ReloadServerData();
+                Snackbar.Add($"{ConstantString.DELETESUCCESS}", MudBlazor.Severity.Success);
+            }
+            catch (Exception e)
+            {
+                Snackbar.Add(e.Message, MudBlazor.Severity.Error);
+            }
+        }
+    }
+}

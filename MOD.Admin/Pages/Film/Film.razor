@@ -1,0 +1,281 @@
+@page "/film"
+@inject HttpClient httpClient
+
+<PageTitle>Film</PageTitle>
+
+<article class="content px-4">
+    <MudTable ServerData="@(new Func<TableState, Task<TableData<FilmDTO>>>(ServerReload))"
+              Dense="true" Hover="true" @ref="table" Elevation="25">
+        <ColGroup>
+            <col style="width: 5%;" />
+            <col />
+            <col />
+            <col />
+            <col />
+            <col style="width: 20%;" />
+        </ColGroup>
+        <ToolBarContent>
+            <div class="justify-start pt-3">
+                <MudText Typo="Typo.h6">Films</MudText>
+                <MudHidden Breakpoint="Breakpoint.SmAndDown">
+
+                    <MudButton DisableElevation Variant="Variant.Outlined" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               Size="Size.Small"
+                               OnClick="OnCreate"
+                               Style="margin-right: 4px; margin-bottom:4px"
+                               IconColor="Color.Surface">@ConstantString.CREATE</MudButton>
+                </MudHidden>
+            </div>
+            <MudSpacer></MudSpacer><MudTextField T="string" @bind-Value="searchString" @bind-Value:after="@table.ReloadServerData" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh><MudTableSortLabel SortLabel="sort_id" T="FilmDTO">Id</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortLabel="sort_name" T="FilmDTO">Title</MudTableSortLabel></MudTh>
+            <MudTh>Release Date</MudTh>
+            <MudTh>Free</MudTh>
+            <MudTh>Director</MudTh>
+            <MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Id">@context.Id</MudTd>
+            <MudTd DataLabel="Title">@context.Title</MudTd>
+            <MudTd DataLabel="Release Date">@context.Released</MudTd>
+            <MudTd DataLabel="Free"><MudIconButton Color="Color.Primary" Icon="@(context.Free? @Icons.Material.Filled.MoneyOff:@Icons.Material.Filled.AttachMoney)"></MudIconButton></MudTd>
+            <MudTd DataLabel="Free">@context.Director.Name</MudTd>
+            <MudTd DataLabel="Actions">
+                <MudIconButton Icon="@Icons.Material.Filled.Category" aria-label="edit" OnClick="(()=>OnGenreUpdate(context))"></MudIconButton>
+                <MudIconButton Icon="@Icons.Material.Filled.BookmarkAdd" aria-label="edit" Color="Color.Tertiary" OnClick="(()=>OnSimilarUpdate(context))"></MudIconButton>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" aria-label="edit" Color="Color.Warning" OnClick="(()=>OnUpdate(context))"></MudIconButton>
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" aria-label="delete" Color="Color.Error" OnClick="(()=>OnDelete(context.Id))"></MudIconButton>
+            </MudTd>
+
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText>No matching records found</MudText>
+        </NoRecordsContent>
+        <LoadingContent>
+            <MudText>Loading...</MudText>
+        </LoadingContent>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+</article>
+
+@code {
+
+    private IEnumerable<FilmDTO> pagedData;
+    private MudTable<FilmDTO> table;
+
+    public List<GenreDTO> _genreList { get; set; } = new();
+    public List<DirectorDTO> _directorList { get; set; } = new();
+    public List<SimilarFilmDTO> _similarFilms { get; set; } = new();
+    public IEnumerable<FilmDTO> data { get; set; }
+
+
+    private int totalItems;
+    private string searchString = null;
+
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            httpClient.GetFromJsonAsync<List<GenreDTO>>("/api/Genres").ContinueWith(e =>
+            {
+                _genreList = e.Result;
+            });
+            httpClient.GetFromJsonAsync<List<DirectorDTO>>("/api/director").ContinueWith(e =>
+            {
+                _directorList = e.Result;
+            });
+
+            StateHasChanged();
+
+        }
+        return base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task<TableData<FilmDTO>> ServerReload(TableState state)
+    {
+        data = await httpClient.GetFromJsonAsync<IEnumerable<FilmDTO>>("/api/Film");
+        data = data.Where(element =>
+        {
+            if (string.IsNullOrWhiteSpace(searchString))
+                return true;
+            if (element.Title.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+                return true;
+            return false;
+        }).ToArray();
+        totalItems = data.Count();
+        switch (state.SortLabel)
+        {
+            case "sort_id":
+                data = data.OrderByDirection(state.SortDirection, o => o.Id);
+                break;
+            case "sort_name":
+                data = data.OrderByDirection(state.SortDirection, o => o.Title);
+                break;
+        }
+        pagedData = data.Skip(state.Page * state.PageSize).Take(state.PageSize).ToArray();
+        return new TableData<FilmDTO>() { TotalItems = totalItems, Items = pagedData };
+    }
+
+    private async Task OnCreate()
+    {
+
+        var dto = new FilmDTO();
+        var parameters = new DialogParameters
+            {
+                { nameof(_FilmFormDialog.model),dto },
+                { nameof(_FilmFormDialog.DirectorList),_directorList },
+            };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = DialogService.Show<_FilmFormDialog>("Add Film", parameters, options);
+
+        var state = await dialog.Result;
+        if (!state.Canceled)
+        {
+            try
+            {
+                var result = await httpClient.PostAsJsonAsync<FilmDTO>("/api/Film", dto);
+                result.EnsureSuccessStatusCode();
+                await table.ReloadServerData();
+                Snackbar.Add($"{ConstantString.CREATESUCCESS}", MudBlazor.Severity.Success);
+            }
+            catch (Exception e)
+            {
+                Snackbar.Add(e.Message, MudBlazor.Severity.Error);
+            }
+        }
+    }
+
+    private async Task OnUpdate(FilmDTO record)
+    {
+        var dto = record;
+        var parameters = new DialogParameters
+            {
+                { nameof(_FilmFormDialog.model),dto },
+                { nameof(_FilmFormDialog.DirectorList),_directorList },
+            };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = DialogService.Show<_FilmFormDialog>("Update Film", parameters, options);
+
+        var state = await dialog.Result;
+        if (!state.Canceled)
+        {
+            try
+            {
+                var result = await httpClient.PutAsJsonAsync<FilmDTO>("/api/Film/" + dto.Id, dto);
+                result.EnsureSuccessStatusCode();
+                await table.ReloadServerData();
+                Snackbar.Add($"{ConstantString.UPDATESUCCESS}", MudBlazor.Severity.Success);
+            }
+            catch (Exception e)
+            {
+                Snackbar.Add(e.Message, MudBlazor.Severity.Error);
+            }
+        }
+    }
+
+    private async Task OnDelete(int id)
+    {
+        var parameters = new DialogParameters
+                        {
+                    { nameof(DeleteConfirmation.ContentText), "Are you sure you want to delete the select director" }
+                        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, DisableBackdropClick = true };
+        var dialog = DialogService.Show<DeleteConfirmation>
+        (string.Format("Delete Film"), parameters, options);
+        var state = await dialog.Result;
+        if (!state.Canceled)
+        {
+            try
+            {
+                var result = await httpClient.DeleteAsync("/api/Film/" + id);
+                result.EnsureSuccessStatusCode();
+                await table.ReloadServerData();
+                Snackbar.Add($"{ConstantString.DELETESUCCESS}", MudBlazor.Severity.Success);
+            }
+            catch (Exception e)
+            {
+                Snackbar.Add(e.Message, MudBlazor.Severity.Error);
+            }
+        }
+    }
+
+    private async Task OnGenreUpdate(FilmDTO record)
+    {
+        var dto = record.Genres.Select(a => new FilmGenreDTO()
+            {
+                FilmId = a.Id,
+                GenreId = a.Id
+            }).ToList();
+
+        var parameters = new DialogParameters
+            {
+                { nameof(_FilmGenreFormDialog.model),dto },
+                { nameof(_FilmGenreFormDialog._genreList),_genreList },
+                { nameof(_FilmGenreFormDialog.options),dto.Select(a=>a.GenreId+"") },
+                { nameof(_FilmGenreFormDialog._filmId),record.Id },
+            };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = DialogService.Show<_FilmGenreFormDialog>("Update Film Genre", parameters, options);
+
+        var state = await dialog.Result;
+        if (!state.Canceled)
+        {
+            try
+            {
+                var result = await httpClient.PutAsJsonAsync<List<FilmGenreDTO>>("/api/FilmGenreContoller/" + record.Id, (List<FilmGenreDTO>)state.Data);
+                result.EnsureSuccessStatusCode();
+                await table.ReloadServerData();
+                Snackbar.Add($"{ConstantString.UPDATESUCCESS}", MudBlazor.Severity.Success);
+            }
+            catch (Exception e)
+            {
+                Snackbar.Add(e.Message, MudBlazor.Severity.Error);
+            }
+        }
+    }
+
+    private async Task OnSimilarUpdate(FilmDTO record)
+    {
+        var dto = record.SimilarFilms.Select(a => new SimilarFilmDTO()
+            {
+                FilmId = a.FilmId,
+                SimilarFilmId = a.SimilarFilmId
+            }).ToList();
+
+        var parameters = new DialogParameters
+            {
+                { nameof(_FilmSimilarFormDialog.model),dto },
+                { nameof(_FilmSimilarFormDialog._Films),data.Where(a=>a.Id!=record.Id).ToList() },
+                { nameof(_FilmSimilarFormDialog.options),dto.Select(a=>a.SimilarFilmId+"") },
+                { nameof(_FilmSimilarFormDialog._filmId),record.Id },
+            };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = DialogService.Show<_FilmSimilarFormDialog>("Add Similar Films", parameters, options);
+
+        var state = await dialog.Result;
+        if (!state.Canceled)
+        {
+            try
+            {
+                var result = await httpClient.PutAsJsonAsync<List<SimilarFilmDTO>>("/api/SimilarFilm/" + record.Id, (List<SimilarFilmDTO>)state.Data);
+                result.EnsureSuccessStatusCode();
+                await table.ReloadServerData();
+                Snackbar.Add($"{ConstantString.UPDATESUCCESS}", MudBlazor.Severity.Success);
+            }
+            catch (Exception e)
+            {
+                Snackbar.Add(e.Message, MudBlazor.Severity.Error);
+            }
+        }
+    }
+}

@@ -1,0 +1,41 @@
+﻿@page "/film/{id}/play"
+@inject HttpClient _httpClient
+@inject NavigationManager _nav
+
+@code {
+    [Parameter]
+    public string id { get; set; }
+    public FilmDTO _film { get; set; }
+
+    protected async override Task OnInitializedAsync()
+    {
+        try
+        {
+            _film = await _httpClient.GetFromJsonAsync<FilmDTO>("/api/film/" + id);
+            if (_film == null)
+                throw new Exception();
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Film not found!", Severity.Warning);
+            _nav.NavigateTo("/");
+        }
+    }
+}
+@if (_film != null)
+{
+    <article class="content px-4">
+        <MudGrid>
+            <MudItem xs="12">
+                <MudCard Elevation="2">
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowBack" @onclick=@(()=>{_nav.NavigateTo("/film/"+id);}) Style="font-size: 3rem!important;position: absolute;margin-left: 8px;margin-top: 8px;" Color="Color.Error" aria-label="delete"></MudIcon>
+                    <div style="width:100%;height:600px;">
+                        <iframe width="900" height="600"
+                            src="@("https://www.youtube.com/embed/"+_film.GetVideoId())">
+                        </iframe>
+                    </div>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    </article>
+}

@@ -1,0 +1,26 @@
+﻿@inherits MudComponentBase
+<MudDialog>
+
+    <DialogContent>
+        <div style="width:900px;height:600px;">
+            <iframe width="900" height="600"
+                    src="@("https://www.youtube.com/embed/"+model.GetVideoId())">
+            </iframe>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">@ConstantString.CLOSE</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+
+    [CascadingParameter]
+    MudDialogInstance MudDialog { get; set; } = default!;
+
+    [EditorRequired]
+    [Parameter]
+    public FilmDTO model { get; set; } = default!;
+
+    void Cancel() => MudDialog.Cancel();
+}

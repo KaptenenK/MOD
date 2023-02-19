@@ -1,0 +1,118 @@
+﻿@page "/film/{id}"
+@inject HttpClient _httpClient
+@inject NavigationManager _nav
+
+@code {
+    [Parameter]
+    public string id { get; set; }
+    public FilmDTO _film { get; set; }
+
+    protected async override Task OnParametersSetAsync()
+    {
+        try
+        {
+            _film = await _httpClient.GetFromJsonAsync<FilmDTO>("/api/film/" + id);
+            if (_film == null)
+                throw new Exception();
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Film not found!", Severity.Warning);
+            _nav.NavigateTo("/");
+        }
+        //return base.OnParametersSetAsync();
+    }
+
+    // used for popup play
+    protected async Task PlayVideo()
+    {
+        var parameters = new DialogParameters
+            {
+                { nameof(_FilmPlayFormDialog.model),_film },
+            };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = DialogService.Show<_FilmPlayFormDialog>(_film.Title, parameters, options);
+
+        var state = await dialog.Result;
+    }
+}
+@if (_film != null)
+{
+    <MudGrid>
+        <MudItem xs="9">
+            <MudLink Href="@("/film/"+id+"/play")">
+                <MudImage Fluid="true" Src="@("https://img.youtube.com/vi/"+_film.GetVideoId()+"/maxresdefault.jpg")" Class="rounded-lg" />
+            </MudLink>
+        </MudItem>
+        <MudItem xs="3">
+            <MudPaper Class="d-flex align-center flex-wrap  mud-width-full py-8" Width="100%" Height="100%">
+                <div>
+                    <MudCard Elevation="0">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Align="Align.Left" Typo="Typo.h4"><MudText Typo="Typo.h4">@_film.Title</MudText></MudText>
+                                <hr />
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudText Typo="Typo.h6">DESCRIPTION</MudText>
+                            <MudText Typo="Typo.caption">@_film.Description</MudText>
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudChip Icon="@Icons.Material.Filled.Person" Color="@(ConstantString.COLORLIST[new Random().Next(ConstantString.COLORLIST.Count())])">@_film.Director.Name</MudChip>
+                        </MudCardActions>
+                    </MudCard>
+                </div>
+                <div>
+                    <MudCard Elevation="0">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Align="Align.Left" Typo="Typo.h4">Genres</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            @foreach (var genre in _film.Genres)
+                            {
+                                <MudChip Variant="Variant.Text" Color="@(ConstantString.COLORLIST[new Random().Next(ConstantString.COLORLIST.Count())])">@genre.Name</MudChip>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudCard Elevation="0">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Align="Align.Center" Typo="Typo.h4">Similar Movies</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+
+                    <MudGrid Class="p-5">
+                        @if (_film.SimilarFilms != null)
+                            foreach (var film in _film.SimilarFilms)
+                            {
+                                <MudItem xs="4" @onclick=@(()=>{_nav.NavigateTo("/film/"+film.SimilarFilmId);})>
+                                    <MudCard>
+                                        <MudCardMedia Image="@("https://img.youtube.com/vi/"+film.Similar.GetVideoId()+"/maxresdefault.jpg")" Height="200" />
+                                        <MudCardContent>
+                                            <MudText Typo="Typo.h5">@film.Similar.Title</MudText>
+                                            <MudText Typo="Typo.body2">@film.Similar.Description</MudText>
+                                        </MudCardContent>
+                                        <MudCardActions Class="d-flex">
+                                            <MudChip Icon="@Icons.Material.Filled.Person" Color="@(ConstantString.COLORLIST[new Random().Next(ConstantString.COLORLIST.Count())])">@film.Similar.Director.Name</MudChip>
+                                            <MudIconButton Style="margin-left: auto;" Icon="@(film.Similar.Free? @Icons.Material.Filled.MoneyOff:@Icons.Material.Filled.AttachMoney)" Color="Color.Warning" />
+                                        </MudCardActions>
+                                    </MudCard>
+                                </MudItem>
+                            }
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+    </MudGrid>
+}

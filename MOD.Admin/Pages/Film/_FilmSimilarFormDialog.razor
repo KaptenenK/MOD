@@ -1,0 +1,64 @@
+@inherits MudComponentBase
+<MudDialog>
+    <DialogContent>
+        <MudForm Model="@model" @ref="@_form">
+            <MudGrid>
+                <MudSelect MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionText))" MultiSelection="true" @bind-Value="value" @bind-SelectedValues="options" T="string" Label="Add Similar Films" AdornmentIcon="@Icons.Material.Filled.Search" AnchorOrigin="Origin.BottomCenter">
+                    @foreach (var film in _Films)
+                    {
+                        <MudSelectItem T="string" Value="@film.Id.ToString()">@film.Title</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">@ConstantString.CANCEL</MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" OnClick="Submit">@ConstantString.OK</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+
+    MudForm? _form = default!;
+    [CascadingParameter]
+    MudDialogInstance MudDialog { get; set; } = default!;
+    [EditorRequired]
+    [Parameter]
+    public List<SimilarFilmDTO> model { get; set; } = default!;
+    [EditorRequired]
+    [Parameter]
+    public List<FilmDTO> _Films { get; set; } = new();
+    [EditorRequired]
+    [Parameter]
+    public int _filmId { get; set; } = new();
+
+    private string value { get; set; } = String.Empty;
+    [EditorRequired]
+    [Parameter]
+    public IEnumerable<string> options { get; set; } = new HashSet<string>() { };
+    private string GetMultiSelectionText(List<string> selectedValues)
+    => $"Similar Films{(selectedValues.Count > 1 ? "s" : "")}: {string.Join(", ", _Films.Where(b => selectedValues.Contains(b.Id.ToString())).Select(a => a.Title))}";
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        return base.OnAfterRenderAsync(firstRender);
+    }
+
+
+    async Task Submit()
+    {
+        model = options.Select(a => new SimilarFilmDTO()
+            {
+                FilmId = _filmId,
+                SimilarFilmId = int.Parse(a)
+            }).ToList();
+
+        await _form!.Validate();
+        if (_form!.IsValid)
+        {
+            MudDialog.Close(DialogResult.Ok(model));
+        }
+    }
+    void Cancel() => MudDialog.Cancel();
+}

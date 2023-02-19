@@ -1,0 +1,89 @@
+@inherits MudComponentBase
+<MudDialog>
+    <DialogContent>
+        <MudForm Model="@model" @ref="@_form">
+            <MudGrid>
+                <MudItem xs="8">
+                    <MudTextField Label="Film Title" @bind-Value="model.Title"
+                                  For="@(() => model.Title)"
+                                  Required="true"
+                                  RequiredError="Film Title is required!"></MudTextField>
+                </MudItem>
+                <MudItem xs="4">
+                    <MudCheckBox @bind-Checked="model.Free"
+                                 Label="Is Free"
+                                 Color="Color.Primary"></MudCheckBox>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField Label="Film Url" @bind-Value="model.FilmUrl"
+                                  For="@(() => model.FilmUrl)"
+                                  Required="true"
+                                  RequiredError="Film Url is required!"></MudTextField>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudSelect 
+                        T="int"
+                        HelperText="Select Director" 
+                        Required="true" 
+                        @bind-Value="model.DirectorId" 
+                        Variant="Variant.Text">
+                        @foreach (var director in DirectorList)
+                        {
+                            <MudSelectItem Value="@director.Id">@director.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudDatePicker Label="Release Date"
+                                   @bind-Date="@model.Released" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField Label="Description" @bind-Value="model.Description"
+                                  For="@(() => model.Description)"
+                                  Required="false"
+                                  Lines="3"
+                                  RequiredError="Film Url is required!"></MudTextField>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">@ConstantString.CANCEL</MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" OnClick="Submit">@ConstantString.OK</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+
+    MudForm? _form = default!;
+    [CascadingParameter]
+    MudDialogInstance MudDialog { get; set; } = default!;
+    [EditorRequired]
+    [Parameter]
+    public FilmDTO model { get; set; } = default!;
+
+    [EditorRequired]
+    [Parameter]
+    public List<DirectorDTO> DirectorList { get; set; } = default!;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if(firstRender)
+        {
+            model.DirectorId = DirectorList.FirstOrDefault().Id;
+            StateHasChanged();
+        }
+        base.OnAfterRender(firstRender);
+    }
+
+    async Task Submit()
+    {
+        await _form!.Validate();
+        if (_form!.IsValid)
+        {
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+    }
+    void Cancel() => MudDialog.Cancel();
+}

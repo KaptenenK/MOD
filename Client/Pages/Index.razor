@@ -1,0 +1,58 @@
+﻿@page "/"
+@using System.Web;
+@inherits IndexBase
+
+<PageTitle>Home</PageTitle>
+
+@if (_filmList != null)
+{
+    <MudCarousel Class="mud-width-full" Style="height:500px;" ShowArrows="true" ShowBullets="true" EnableSwipeGesture="true" AutoCycle="true" TData="object">
+        @foreach (var film in _filmList)
+        {
+            <MudCarouselItem Transition="Transition.Slide" Color="@Color.Dark">
+                <div class="d-flex flex-column justify-center" style="height:100%">
+                    <MudImage ObjectFit="ObjectFit.Fill" ObjectPosition="ObjectPosition.Center" Src="@("https://img.youtube.com/vi/"+film.GetVideoId()+"/maxresdefault.jpg")" Alt="Mony the dog" Elevation="25" Class="rounded-lg" />
+                </div>
+            </MudCarouselItem>
+        }
+    </MudCarousel>
+}
+else
+{
+    <MudCarousel Class="mud-width-full" Style="height:500px;" ShowArrows="false" ShowBullets="false" EnableSwipeGesture="true" AutoCycle="true" TData="object">
+        <MudCarouselItem Transition="Transition.Slide" Style="height:100%;" Color="@Color.Surface">
+            <div class="" style="height:100%">
+                <MudSkeleton Width="100%" Height="100%" SkeletonType="SkeletonType.Rectangle" Animation="Animation.Wave" />
+            </div>
+        </MudCarouselItem>
+    </MudCarousel>
+}
+
+<MudTabs Outlined="true" MinimumTabWidth="20px" Color="Color.Surface" Centered="true" Position="Position.Top" MaxHeight="2">
+    @foreach (var genre in _genreList)
+    {
+        <MudTabPanel W Text="@genre.Name" Icon="@Icons.Material.Filled.Category">
+            <MudGrid Class="p-5">
+                @if (_filmList != null)
+                    foreach (var film in _filmList.Where(a => a.Genres.Select(b => b.Id).Contains(genre.Id)).ToList())
+                    {
+
+                        <MudItem xs="4" @onclick=@(()=>{_nav.NavigateTo("/film/"+film.Id);})>
+                            <MudCard>
+                                <MudCardMedia Image="@("https://img.youtube.com/vi/"+film.GetVideoId()+"/maxresdefault.jpg")" Height="200" />
+                                <MudCardContent>
+                                    <MudText Typo="Typo.h5">@film.Title</MudText>
+                                    <MudText Typo="Typo.body2">@film.Description</MudText>
+                                </MudCardContent>
+                                <MudCardActions Class="d-flex">
+                                    <MudChip Icon="@Icons.Material.Filled.Person" Color="@(ConstantString.COLORLIST[new Random().Next(ConstantString.COLORLIST.Count())])">@film.Director.Name</MudChip>
+                                    <MudIconButton Style="margin-left: auto;" Icon="@(film.Free? @Icons.Material.Filled.MoneyOff:@Icons.Material.Filled.AttachMoney)" Color="Color.Warning" />
+                                </MudCardActions>
+                            </MudCard>
+                        </MudItem>
+
+                    }
+            </MudGrid>
+        </MudTabPanel>
+    }
+</MudTabs>
